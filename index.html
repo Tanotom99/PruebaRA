@@ -15,11 +15,11 @@
 <script>
 // Variables globales para ambos modelos
 let cockatooModel;
-let secondModel; // <-- Nuevo modelo
+let secondModel;
 
 // Constantes
 const COCKATOO_URL = 'chip_cockatoo_-_indigo_park.glb';
-const PARROT_URL = 'pip_parrot_-_indigo_park.glb'; 
+const PARROT_URL = 'pip_parrot_-_indigo_park.glb'; // ✅ Constante definida
 const INITIAL_SCALE = 0.3;
 
 async function activateXR() {
@@ -44,9 +44,7 @@ async function activateXR() {
     function (gltf) {
       cockatooModel = gltf.scene;
       
-      // Posición: 0.5m de altura, 2m al frente. 
-      // Posición X = -0.5 (ligeramente a la izquierda)
-      cockatooModel.position.set(-0.5, 0.5, -2); 
+      cockatooModel.position.set(-0.5, 0.5, -2); 
       cockatooModel.scale.set(INITIAL_SCALE, INITIAL_SCALE, INITIAL_SCALE);
       
       scene.add(cockatooModel);
@@ -56,24 +54,21 @@ async function activateXR() {
       console.error('Error al cargar el Cacatúa:', error);
     }
   );
-  
-  // **CARGAR MODELO 2: SEGUNDO OBJETO**
+  
+  // **CARGAR MODELO 2: LORO**
   loader.load(
-    SECOND_MODEL_URL,
+    PARROT_URL, // ✅ CORREGIDO: Usando la constante PARROT_URL
     function (gltf) {
-      secondModel = gltf.scene;
+      secondModel = gltf.scene; // Sigue usando 'secondModel' como variable interna
       
-      // Posición X = +0.5 (1 metro a la derecha del cacatúa)
-      // Mismas Y y Z que el cacatúa
-      secondModel.position.set(0.5, 0.5, -2); 
+      secondModel.position.set(0.5, 0.5, -2); 
       secondModel.scale.set(INITIAL_SCALE, INITIAL_SCALE, INITIAL_SCALE);
       
       scene.add(secondModel);
     },
     undefined, 
     function (error) {
-      console.error('Error al cargar el segundo modelo:', error);
-      alert('Asegúrate de que "segundo_modelo.glb" existe.');
+      console.error('Error al cargar el Loro:', error);
     }
   );
 
@@ -117,7 +112,7 @@ async function activateXR() {
         cockatooModel.rotation.y += 0.01;
       }
       if (secondModel) {
-        secondModel.rotation.y -= 0.005; // Gira más lento y en dirección opuesta
+        secondModel.rotation.y -= 0.005; 
       }
 
       renderer.render(scene, camera)
@@ -128,6 +123,7 @@ async function activateXR() {
 </script>
 </body>
 </html>
+
 
 
 
