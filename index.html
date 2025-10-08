@@ -40,12 +40,12 @@ async function activateXR() {
       
       // Posiciona y escala el modelo para que sea visible en AR
       // Posición: 0.5m de altura, 1m al frente
-      cockatooModel.position.set(0, 0.5, -1); 
+      cockatooModel.position.set(0, 0.5, -2) 
       
       // **VALOR DE ESCALA AJUSTADO:**
       // Lo hemos cambiado de 0.2 a 1.0. Esto lo hace 5 veces más grande.
       // Si necesitas que sea aún más grande, prueba con 2.0.
-      cockatooModel.scale.set(1.0, 1.0, 1.0); // <-- ¡CAMBIO CLAVE AQUÍ!
+      cockatooModel.scale.set(0.3, 0.3, 0.3); // <-- ¡CAMBIO CLAVE AQUÍ!
       
       scene.add(cockatooModel);
     },
@@ -104,6 +104,7 @@ async function activateXR() {
 </script>
 </body>
 </html>
+
 
 
 
