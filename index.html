@@ -1,154 +1,164 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <title>Hello WebXR - AR Placement</title>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Hello WebXR - AR Escala y Movimiento</title>
 
-    <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
-    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
-<button onclick="activateXR()">Start Hello WebXR</button>
+<button onclick="activateXR()">Start AR</button>
 <script>
 let renderer, scene, camera, session;
 let hitTestSource = null;
 let referenceSpace = null;
 let cockatooModel = null;
-let placementMarker = null; // Un marcador para mostrar dónde se colocará el modelo
+let placementMarker = null;
 
-// Nombre de tu archivo GLB
 const MODEL_URL = 'chip_cockatoo_-_indigo_park.glb';
+const INITIAL_SCALE = 0.2;
 
 async function activateXR() {
-  // El código para iniciar la sesión es el mismo, pero con el cambio de módulos
+    const canvas = document.createElement("canvas");
+    document.body.appendChild(canvas);
+    const gl = canvas.getContext("webgl", {xrCompatible: true});
 
-  const canvas = document.createElement("canvas");
-  document.body.appendChild(canvas);
-  const gl = canvas.getContext("webgl", {xrCompatible: true});
+    scene = new THREE.Scene();
+    
+    // Luces
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 5, 5); 
+    scene.add(directionalLight);
+    
+    // Cargar el modelo GLB (sin añadirlo a la escena todavía)
+    const loader = new THREE.GLTFLoader();
+    loader.load(MODEL_URL, function (gltf) {
+        cockatooModel = gltf.scene;
+        cockatooModel.scale.set(INITIAL_SCALE, INITIAL_SCALE, INITIAL_SCALE); 
+    }, undefined, function (error) {
+        console.error('Error al cargar el modelo:', error);
+    });
 
-  scene = new THREE.Scene();
-  
-  // Luces
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
-  scene.add(ambientLight);
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(0, 5, 5); 
-  scene.add(directionalLight);
-  
-  // **Cargar el modelo GLB (sin añadirlo a la escena todavía)**
-  const loader = new THREE.GLTFLoader();
-  loader.load(MODEL_URL, function (gltf) {
-    cockatooModel = gltf.scene;
-    cockatooModel.scale.set(0.2, 0.2, 0.2); // Escala inicial
-    // NOTA: No añadimos el modelo a la escena aquí. Se añade al tocar.
-  }, undefined, function (error) {
-    console.error('Error al cargar el modelo:', error);
-  });
+    // Crear el marcador (aro)
+    const geometry = new THREE.RingGeometry(0.1, 0.12, 32).rotateX(-Math.PI / 2);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00FF00 }); // Verde para visibilidad
+    placementMarker = new THREE.Mesh(geometry, material);
+    placementMarker.matrixAutoUpdate = false;
+    placementMarker.visible = false;
+    scene.add(placementMarker);
+    
+    renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        preserveDrawingBuffer: true,
+        canvas: canvas,
+        context: gl
+    });
+    renderer.autoClear = false;
 
-  // **CREAR UN MARCADOR DE COLOCACIÓN:** Un círculo o anillo para guiar al usuario
-  const geometry = new THREE.RingGeometry(0.15, 0.18, 32).rotateX(-Math.PI / 2);
-  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  placementMarker = new THREE.Mesh(geometry, material);
-  placementMarker.matrixAutoUpdate = false;
-  placementMarker.visible = false; // Inicialmente invisible
-  scene.add(placementMarker);
-  
-  renderer = new THREE.WebGLRenderer({
-    alpha: true,
-    preserveDrawingBuffer: true,
-    canvas: canvas,
-    context: gl
-  });
-  renderer.autoClear = false;
+    camera = new THREE.PerspectiveCamera();
+    camera.matrixAutoUpdate = false;
 
-  camera = new THREE.PerspectiveCamera();
-  camera.matrixAutoUpdate = false;
+    // IMPORTANTE: Solicitar el módulo 'hit-test'
+    session = await navigator.xr.requestSession("immersive-ar", {
+        requiredFeatures: ['local', 'hit-test'],
+    });
+    session.updateRenderState({
+        baseLayer: new XRWebGLLayer(session, gl)
+    });
+    
+    referenceSpace = await session.requestReferenceSpace('local');
 
-  // **IMPORTANTE: Solicitar el módulo 'hit-test'**
-  session = await navigator.xr.requestSession("immersive-ar", {
-    requiredFeatures: ['local', 'hit-test'],
-  });
-  session.updateRenderState({
-    baseLayer: new XRWebGLLayer(session, gl)
-  });
-  
-  referenceSpace = await session.requestReferenceSpace('local');
+    // Crear el origen del rayo de Hit-Test
+    hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
 
-  // **CREAR EL ORIGEN DEL RAYO DE HIT-TEST**
-  hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
+    // AÑADIR EL EVENTO DE TOQUE
+    session.addEventListener('select', onSelect);
 
-  // **AÑADIR EL EVENTO DE TOQUE**
-  session.addEventListener('select', onSelect);
-
-  session.requestAnimationFrame(onXRFrame);
+    session.requestAnimationFrame(onXRFrame);
 }
 
-// **FUNCIÓN QUE SE EJECUTA AL TOCAR LA PANTALLA**
+// **FUNCIÓN QUE MANEJA LA COLOCACIÓN Y LA ESCALA**
 function onSelect() {
-  if (cockatooModel && placementMarker.visible) {
-    // Si el modelo ya está en la escena, lo quitamos para volver a colocarlo
-    if (cockatooModel.parent) {
-      scene.remove(cockatooModel);
-    }
-    
-    // Colocar el modelo en la posición del marcador
-    cockatooModel.position.setFromMatrixPosition(placementMarker.matrix);
-    // Ajuste de altura para que el modelo no esté hundido en la superficie
-    cockatooModel.position.y += 0.05; // Ajusta un poco hacia arriba
-    
-    scene.add(cockatooModel);
-  }
+    if (!cockatooModel || !placementMarker.visible) return;
+
+    if (cockatooModel.parent) {
+        // 1. SI EL MODELO YA ESTÁ COLOCADO (y el aro está visible en una superficie)
+
+        // Escalar el modelo (hacerlo 20% más grande)
+        let currentScale = cockatooModel.scale.x;
+        let newScale = currentScale * 1.2;
+        
+        // Limitar la escala máxima para evitar que sea inmanejable
+        if (newScale > 1.5) { 
+            newScale = INITIAL_SCALE; // Reiniciar si es muy grande
+        }
+
+        cockatooModel.scale.set(newScale, newScale, newScale);
+        console.log("Nuevo tamaño:", newScale);
+        
+        // 2. Teletransportar el modelo a la posición del aro
+        cockatooModel.position.setFromMatrixPosition(placementMarker.matrix);
+        // Ajuste de altura para que el modelo no esté hundido
+        cockatooModel.position.y += newScale * 0.1; 
+
+    } else {
+        // SI EL MODELO NO ESTÁ COLOCADO, LO COLOCA POR PRIMERA VEZ
+        cockatooModel.position.setFromMatrixPosition(placementMarker.matrix);
+        cockatooModel.position.y += INITIAL_SCALE * 0.1; 
+        scene.add(cockatooModel);
+    }
 }
 
 // Bucle de renderizado
 const onXRFrame = (time, frame) => {
-  session.requestAnimationFrame(onXRFrame);
+    session.requestAnimationFrame(onXRFrame);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer)
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer)
+    const pose = frame.getViewerPose(referenceSpace);
+    if (pose) {
+        const view = pose.views[0];
 
-  const pose = frame.getViewerPose(referenceSpace);
-  if (pose) {
-    const view = pose.views[0];
+        const viewport = session.renderState.baseLayer.getViewport(view);
+        renderer.setSize(viewport.width, viewport.height)
 
-    const viewport = session.renderState.baseLayer.getViewport(view);
-    renderer.setSize(viewport.width, viewport.height)
+        camera.matrix.fromArray(view.transform.matrix)
+        camera.projectionMatrix.fromArray(view.projectionMatrix);
+        camera.updateMatrixWorld(true);
 
-    camera.matrix.fromArray(view.transform.matrix)
-    camera.projectionMatrix.fromArray(view.projectionMatrix);
-    camera.updateMatrixWorld(true);
+        // GESTIÓN DEL HIT-TEST: Actualiza la posición del aro
+        if (hitTestSource) {
+            const hitTestResults = frame.getHitTestResults(hitTestSource);
 
-    // **GESTIÓN DEL HIT-TEST**
-    if (hitTestSource) {
-      const hitTestResults = frame.getHitTestResults(hitTestSource);
+            if (hitTestResults.length > 0) {
+                const hit = hitTestResults[0];
+                const pose = hit.getPose(referenceSpace);
+                
+                // Mover el marcador a la posición de la superficie y hacerlo visible
+                placementMarker.matrix.fromArray(pose.transform.matrix);
+                placementMarker.visible = true;
+            } else {
+                placementMarker.visible = false;
+            }
+        }
+        
+        // ANIMACIÓN: Rotación
+        if (cockatooModel && cockatooModel.parent) {
+            cockatooModel.rotation.y += 0.01;
+        }
 
-      if (hitTestResults.length > 0) {
-        const hit = hitTestResults[0];
-        
-        // Obtener la posición de la intersección
-        const pose = hit.getPose(referenceSpace);
-        
-        // Mover el marcador a esa posición y hacerlo visible
-        placementMarker.matrix.fromArray(pose.transform.matrix);
-        placementMarker.visible = true;
-      } else {
-        placementMarker.visible = false;
-      }
-    }
-    
-    // **ANIMACIÓN Y RENDERIZADO**
-    if (cockatooModel && cockatooModel.parent) {
-      cockatooModel.rotation.y += 0.01;
-    }
-
-    renderer.render(scene, camera)
-  }
+        renderer.render(scene, camera)
+    }
 }
 </script>
 </body>
 </html>
+
 
 
 
